@@ -1,0 +1,873 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+
+<head>
+
+<meta charset="UTF-8">
+
+<meta
+name="viewport"
+content="width=device-width, initial-scale=1.0"
+>
+
+<title>Tellus Leitura</title>
+
+<link rel="manifest" href="manifest.json">
+
+<meta name="theme-color" content="#0b1f3a">
+
+<link
+rel="stylesheet"
+href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+/>
+
+<script
+src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js">
+</script>
+
+<style>
+
+*{
+  box-sizing:border-box;
+}
+
+body{
+  margin:0;
+  font-family:Arial,sans-serif;
+  background:#eef2f7;
+}
+
+.topo{
+  background:#0b1f3a;
+  color:white;
+  padding:20px;
+  text-align:center;
+}
+
+.logo{
+  font-size:28px;
+  font-weight:bold;
+}
+
+.sub{
+  margin-top:5px;
+}
+
+.container{
+  padding:15px;
+}
+
+.card{
+  background:white;
+  padding:16px;
+  border-radius:16px;
+  margin-bottom:16px;
+  box-shadow:0 2px 10px rgba(0,0,0,0.1);
+}
+
+input,select{
+  width:100%;
+  padding:14px;
+  margin-bottom:12px;
+  border:none;
+  border-radius:14px;
+  font-size:16px;
+  box-shadow:0 2px 8px rgba(0,0,0,0.1);
+}
+
+.botao{
+  display:block;
+  background:#1976d2;
+  color:white;
+  text-decoration:none;
+  text-align:center;
+  padding:14px;
+  border-radius:12px;
+  margin-top:12px;
+  font-weight:bold;
+  border:none;
+  width:100%;
+}
+
+.oculto{
+  display:none;
+}
+
+.abas{
+  display:flex;
+}
+
+.aba{
+  flex:1;
+  border:none;
+  padding:15px;
+  font-size:16px;
+  font-weight:bold;
+}
+
+.ativa{
+  background:#1976d2;
+  color:white;
+}
+
+#map{
+  width:100%;
+  height:75vh;
+  border-radius:18px;
+}
+
+.logout{
+  background:#c62828;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div id="loginTela">
+
+<div class="topo">
+
+<div class="logo">
+TELLUS LEITURA
+</div>
+
+<div class="sub">
+Login Operacional
+</div>
+
+</div>
+
+<div class="container">
+
+<div class="card">
+
+<input
+type="email"
+id="email"
+placeholder="Email"
+>
+
+<input
+type="password"
+id="senha"
+placeholder="Senha"
+>
+
+<button
+class="botao"
+onclick="fazerLogin()"
+>
+
+ENTRAR
+
+</button>
+
+</div>
+
+</div>
+
+</div>
+
+<div
+id="appTela"
+class="oculto"
+>
+
+<div class="topo">
+
+<div class="logo">
+TELLUS LEITURA
+</div>
+
+<div class="sub">
+Pesquisa Operacional
+</div>
+
+</div>
+
+<div class="abas">
+
+<button
+class="aba ativa"
+id="btnBusca"
+onclick="abrirAba('busca')"
+>
+BUSCA
+</button>
+
+<button
+class="aba"
+id="btnMapa"
+onclick="abrirAba('mapa')"
+>
+MAPA
+</button>
+
+</div>
+
+<div
+id="abaBusca"
+class="container"
+>
+
+<select id="area"></select>
+
+<input
+list="listaMRUs"
+id="mru"
+placeholder="Digite ou selecione a MRU"
+>
+
+<datalist id="listaMRUs"></datalist>
+
+<input
+type="text"
+id="busca"
+placeholder="Buscar instalação, medidor ou cliente"
+>
+
+<div id="resultados"></div>
+
+</div>
+
+<div
+id="abaMapa"
+class="container oculto"
+>
+
+<select id="areaMapa"></select>
+
+<input
+list="listaMRUsMapa"
+id="mruMapa"
+placeholder="Digite ou selecione a MRU"
+>
+
+<datalist id="listaMRUsMapa"></datalist>
+
+<button
+class="botao"
+onclick="carregarMapa()"
+>
+
+EXIBIR MAPA
+
+</button>
+
+<div id="map"></div>
+
+</div>
+
+<div class="container">
+
+<button
+class="botao logout"
+onclick="logout()"
+>
+
+SAIR
+
+</button>
+
+</div>
+
+</div>
+
+<script type="module">
+
+import { initializeApp }
+
+from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+
+import {
+
+  getAuth,
+  signInWithEmailAndPassword,
+  onAuthStateChanged,
+  signOut
+
+}
+
+from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+
+import {
+
+  getFirestore,
+  doc,
+  getDoc
+
+}
+
+from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+
+const firebaseConfig = {
+
+  apiKey: "AIzaSyDlacPos-Jm7mi5pCWLMaXIZsnQUBXNsBc",
+
+  authDomain:
+  "tellusleitura-f115b.firebaseapp.com",
+
+  projectId:
+  "tellusleitura-f115b",
+
+  storageBucket:
+  "tellusleitura-f115b.firebasestorage.app",
+
+  messagingSenderId:
+  "1088197735339",
+
+  appId:
+  "1:1088197735339:web:6d370186d58f71200fd8ee"
+
+};
+
+const app =
+  initializeApp(firebaseConfig);
+
+const auth =
+  getAuth(app);
+
+const db =
+  getFirestore(app);
+
+window.fazerLogin =
+async function(){
+
+  let email =
+    document.getElementById('email').value;
+
+  let senha =
+    document.getElementById('senha').value;
+
+  try{
+
+    await signInWithEmailAndPassword(
+      auth,
+      email,
+      senha
+    );
+
+  }catch(e){
+
+    alert('Login inválido');
+
+  }
+
+}
+
+window.logout =
+async function(){
+
+  await signOut(auth);
+
+}
+
+let permissoes = [];
+
+let banco = [];
+let indexes = {};
+let map = null;
+
+const AREAS = {
+  "171":"ITABUNA",
+  "172":"IBICARAI",
+  "173":"ILHÉUS",
+  "174":"COARACI",
+  "175":"CANAVIEIRAS",
+  "176":"CAMACAN"
+};
+
+onAuthStateChanged(auth,
+async user => {
+
+  if(!user){
+
+    document
+      .getElementById('loginTela')
+      .classList.remove('oculto');
+
+    document
+      .getElementById('appTela')
+      .classList.add('oculto');
+
+    return;
+
+  }
+
+  let ref =
+    doc(db,'usuarios',user.email);
+
+  let snap =
+    await getDoc(ref);
+
+  if(!snap.exists()){
+
+    alert('Sem permissão');
+
+    logout();
+
+    return;
+
+  }
+
+  let dados =
+    snap.data();
+
+  if(!dados.ativo){
+
+    alert('Usuário desativado');
+
+    logout();
+
+    return;
+
+  }
+
+  permissoes =
+    dados.areas;
+
+  document
+    .getElementById('loginTela')
+    .classList.add('oculto');
+
+  document
+    .getElementById('appTela')
+    .classList.remove('oculto');
+
+  carregarSistema();
+
+});
+
+async function carregarSistema(){
+
+  let response =
+    await fetch('indexes.json');
+
+  indexes =
+    await response.json();
+
+  popularAreas();
+
+}
+
+function popularAreas(){
+
+  let html =
+    '<option value="">Selecionar Área</option>';
+
+  permissoes.forEach(area => {
+
+    html += `
+<option value="${area}">
+${area} - ${AREAS[area]}
+</option>
+`;
+
+  });
+
+  document.getElementById('area')
+    .innerHTML = html;
+
+  document.getElementById('areaMapa')
+    .innerHTML = html;
+
+  // AUTOSELEÇÃO
+
+  if(permissoes.length === 1){
+
+    let unicaArea = permissoes[0];
+
+    document.getElementById('area')
+      .value = unicaArea;
+
+    document.getElementById('areaMapa')
+      .value = unicaArea;
+
+    document.getElementById('area')
+      .style.display = 'none';
+
+    document.getElementById('areaMapa')
+      .style.display = 'none';
+
+    carregarArea();
+    carregarAreaMapa();
+
+  }else{
+
+    document.getElementById('area')
+      .style.display = 'block';
+
+    document.getElementById('areaMapa')
+      .style.display = 'block';
+
+  }
+
+}
+
+window.abrirAba =
+function(tipo){
+
+  document
+    .getElementById('abaBusca')
+    .classList.add('oculto');
+
+  document
+    .getElementById('abaMapa')
+    .classList.add('oculto');
+
+  document
+    .getElementById('btnBusca')
+    .classList.remove('ativa');
+
+  document
+    .getElementById('btnMapa')
+    .classList.remove('ativa');
+
+  if(tipo == 'busca'){
+
+    document
+      .getElementById('abaBusca')
+      .classList.remove('oculto');
+
+    document
+      .getElementById('btnBusca')
+      .classList.add('ativa');
+
+  }else{
+
+    document
+      .getElementById('abaMapa')
+      .classList.remove('oculto');
+
+    document
+      .getElementById('btnMapa')
+      .classList.add('ativa');
+
+  }
+
+}
+
+document
+.getElementById('area')
+.addEventListener('change',
+carregarArea);
+
+async function carregarArea(){
+
+  let area =
+    document.getElementById('area').value;
+
+  banco = [];
+
+  let arquivos =
+    indexes[area];
+
+  for(let arquivo of arquivos){
+
+    let response =
+      await fetch(arquivo);
+
+    let parte =
+      await response.json();
+
+    banco =
+      banco.concat(parte);
+
+  }
+
+  let mrus = [
+
+    ...new Set(
+      banco.map(i => i[0])
+    )
+
+  ];
+
+  mrus.sort();
+
+  let lista =
+    document.getElementById('listaMRUs');
+
+  lista.innerHTML = '';
+
+  mrus.forEach(mru => {
+
+    lista.innerHTML +=
+      `<option value="${mru}">`;
+
+  });
+
+}
+
+document
+.getElementById('mru')
+.addEventListener('input',
+pesquisar);
+
+document
+.getElementById('busca')
+.addEventListener('input',
+pesquisar);
+
+function pesquisar(){
+
+  let mru =
+    document
+    .getElementById('mru')
+    .value
+    .toLowerCase()
+    .trim();
+
+  let texto =
+    document
+    .getElementById('busca')
+    .value
+    .toLowerCase()
+    .trim();
+
+  texto =
+    texto.replace(/\s+/g,' ');
+
+  let resultados =
+    banco.filter(item => {
+
+      let okMru =
+        !mru ||
+        item[0]
+        .toLowerCase()
+        .trim()
+        .includes(mru);
+
+      let pesquisa = (
+
+        String(item[1]) + ' ' +
+        String(item[2]) + ' ' +
+        String(item[7])
+
+      )
+
+      .toLowerCase()
+      .trim()
+      .replace(/\s+/g,' ');
+
+      let okTexto =
+        pesquisa.includes(texto);
+
+      return okMru && okTexto;
+
+    }).slice(0,50);
+
+  let html = '';
+
+  resultados.forEach(item => {
+
+    html += `
+
+<div class="card">
+
+<b>⚡ Instalação</b><br>
+${item[1]}<br><br>
+
+<b>🔢 Medidor</b><br>
+${item[2]}<br><br>
+
+<b>📍 Rua</b><br>
+${item[3]}<br><br>
+
+<b>🏠 Número</b><br>
+${item[4]}<br><br>
+
+<b>🗺 Bairro</b><br>
+${item[5]}<br><br>
+
+<b>🏙 Cidade</b><br>
+${item[6]}<br><br>
+
+<b>👤 Cliente</b><br>
+${item[7]}
+
+<a
+class="botao"
+href="${item[10]}"
+target="_blank"
+>
+
+🗺 Abrir Maps
+
+</a>
+
+</div>
+
+`;
+
+  });
+
+  document
+    .getElementById('resultados')
+    .innerHTML = html;
+
+}
+
+document
+.getElementById('areaMapa')
+.addEventListener(
+'change',
+carregarAreaMapa
+);
+
+async function carregarAreaMapa(){
+
+  let area =
+    document.getElementById('areaMapa').value;
+
+  banco = [];
+
+  let arquivos =
+    indexes[area];
+
+  for(let arquivo of arquivos){
+
+    let response =
+      await fetch(arquivo);
+
+    let parte =
+      await response.json();
+
+    banco =
+      banco.concat(parte);
+
+  }
+
+  let mrus = [
+
+    ...new Set(
+      banco.map(i => i[0])
+    )
+
+  ];
+
+  mrus.sort();
+
+  let lista =
+    document
+    .getElementById('listaMRUsMapa');
+
+  lista.innerHTML = '';
+
+  mrus.forEach(mru => {
+
+    lista.innerHTML +=
+      `<option value="${mru}">`;
+
+  });
+
+}
+
+window.carregarMapa =
+function(){
+
+  let mru =
+    document
+    .getElementById('mruMapa')
+    .value;
+
+  let dados =
+    banco.filter(i => i[0] == mru);
+
+  if(dados.length == 0){
+
+    alert('Nenhuma instalação encontrada');
+    return;
+
+  }
+
+  if(map){
+
+    map.remove();
+
+  }
+
+  map = L.map('map')
+    .setView(
+
+      [
+        parseFloat(dados[0][8]),
+        parseFloat(dados[0][9])
+      ],
+
+      15
+
+    );
+
+  L.tileLayer(
+
+    'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+
+    {
+      attribution:'© OpenStreetMap'
+    }
+
+  ).addTo(map);
+
+  dados.forEach(item => {
+
+    if(
+      item[8] == 'nan' ||
+      item[9] == 'nan'
+    ) return;
+
+    let marker =
+      L.marker([
+
+        parseFloat(item[8]),
+        parseFloat(item[9])
+
+      ]).addTo(map);
+
+    marker.bindPopup(`
+
+<b>⚡ Instalação:</b><br>
+${item[1]}
+<br><br>
+
+<b>👤 Cliente:</b><br>
+${item[7]}
+<br><br>
+
+<b>📍 Rua:</b><br>
+${item[3]}, ${item[4]}
+<br><br>
+
+<a
+href="${item[10]}"
+target="_blank"
+>
+
+🗺 Navegar
+
+</a>
+
+`);
+
+  });
+
+}
+
+if ('serviceWorker' in navigator) {
+
+  window.addEventListener('load', () => {
+
+    navigator.serviceWorker
+      .register('./sw.js?v=12004');
+
+  });
+
+}
+
+</script>
+
+</body>
+</html>
