@@ -389,7 +389,8 @@ const auth =
 const db =
   getFirestore(app);
 
-async function fazerLogin(){
+window.fazerLogin =
+async function(){
 
   let email =
     document.getElementById('email').value;
@@ -415,15 +416,27 @@ async function fazerLogin(){
 
 }
 
-window.fazerLogin = fazerLogin;
-
-async function logout(){
+window.logout =
+async function(){
 
   await signOut(auth);
 
 }
 
-window.logout = logout;
+let permissoes = [];
+
+let banco = [];
+let indexes = {};
+let map = null;
+
+const AREAS = {
+  "171":"ITABUNA",
+  "172":"IBICARAI",
+  "173":"ILHÉUS",
+  "174":"COARACI",
+  "175":"CANAVIEIRAS",
+  "176":"CAMACAN"
+};
 
 onAuthStateChanged(auth,
 async user => {
@@ -471,6 +484,9 @@ async user => {
 
   }
 
+  permissoes =
+    dados.areas;
+
   document
     .getElementById('loginTela')
     .classList.add('oculto');
@@ -479,14 +495,439 @@ async user => {
     .getElementById('appTela')
     .classList.remove('oculto');
 
+  carregarSistema();
+
 });
+
+async function carregarSistema(){
+
+  let response =
+    await fetch('./indexes.json');
+
+  indexes =
+    await response.json();
+
+  popularAreas();
+
+}
+
+function popularAreas(){
+
+  let html =
+    '<option value="">Selecionar Área</option>';
+
+  permissoes.forEach(area => {
+
+    html += `
+<option value="${area}">
+${area} - ${AREAS[area]}
+</option>
+`;
+
+  });
+
+  document.getElementById('area')
+    .innerHTML = html;
+
+  document.getElementById('areaMapa')
+    .innerHTML = html;
+
+  if(permissoes.length === 1){
+
+    let unicaArea = permissoes[0];
+
+    document.getElementById('area')
+      .value = unicaArea;
+
+    document.getElementById('areaMapa')
+      .value = unicaArea;
+
+    document.getElementById('area')
+      .style.display = 'none';
+
+    document.getElementById('areaMapa')
+      .style.display = 'none';
+
+    carregarArea();
+    carregarAreaMapa();
+
+  }else{
+
+    document.getElementById('area')
+      .style.display = 'block';
+
+    document.getElementById('areaMapa')
+      .style.display = 'block';
+
+  }
+
+}
+
+window.abrirAba =
+function(tipo){
+
+  document
+    .getElementById('abaBusca')
+    .classList.add('oculto');
+
+  document
+    .getElementById('abaMapa')
+    .classList.add('oculto');
+
+  document
+    .getElementById('btnBusca')
+    .classList.remove('ativa');
+
+  document
+    .getElementById('btnMapa')
+    .classList.remove('ativa');
+
+  if(tipo == 'busca'){
+
+    document
+      .getElementById('abaBusca')
+      .classList.remove('oculto');
+
+    document
+      .getElementById('btnBusca')
+      .classList.add('ativa');
+
+  }else{
+
+    document
+      .getElementById('abaMapa')
+      .classList.remove('oculto');
+
+    document
+      .getElementById('btnMapa')
+      .classList.add('ativa');
+
+    setTimeout(() => {
+
+      if(map){
+
+        map.invalidateSize();
+
+      }
+
+    },300);
+
+  }
+
+}
+
+document
+.getElementById('area')
+.addEventListener('change',
+carregarArea);
+
+async function carregarArea(){
+
+  let area =
+    document.getElementById('area').value;
+
+  banco = [];
+
+  let arquivos =
+    indexes[area];
+
+  for(let arquivo of arquivos){
+
+    let response =
+      await fetch('./' + arquivo);
+
+    let parte =
+      await response.json();
+
+    banco =
+      banco.concat(parte);
+
+  }
+
+  let mrus = [
+
+    ...new Set(
+      banco.map(i => i[0])
+    )
+
+  ];
+
+  mrus.sort();
+
+  let lista =
+    document.getElementById('listaMRUs');
+
+  lista.innerHTML = '';
+
+  mrus.forEach(mru => {
+
+    lista.innerHTML +=
+      `<option value="${mru}">`;
+
+  });
+
+}
+
+document
+.getElementById('mru')
+.addEventListener('input',
+pesquisar);
+
+document
+.getElementById('busca')
+.addEventListener('input',
+pesquisar);
+
+function pesquisar(){
+
+  let mru =
+    document
+    .getElementById('mru')
+    .value
+    .toLowerCase()
+    .trim();
+
+  let texto =
+    document
+    .getElementById('busca')
+    .value
+    .toLowerCase()
+    .trim();
+
+  texto =
+    texto.replace(/\s+/g,' ');
+
+  let resultados =
+    banco.filter(item => {
+
+      let okMru =
+        !mru ||
+        item[0]
+        .toLowerCase()
+        .trim()
+        .includes(mru);
+
+      let pesquisa = (
+
+        String(item[1]) + ' ' +
+        String(item[2]) + ' ' +
+        String(item[7])
+
+      )
+
+      .toLowerCase()
+      .trim()
+      .replace(/\s+/g,' ');
+
+      let okTexto =
+        pesquisa.includes(texto);
+
+      return okMru && okTexto;
+
+    }).slice(0,50);
+
+  let html = '';
+
+  resultados.forEach(item => {
+
+    html += `
+
+<div class="card">
+
+<b>⚡ Instalação</b><br>
+${item[1]}<br><br>
+
+<b>🔢 Medidor</b><br>
+${item[2]}<br><br>
+
+<b>📍 Rua</b><br>
+${item[3]}<br><br>
+
+<b>🏠 Número</b><br>
+${item[4]}<br><br>
+
+<b>🗺 Bairro</b><br>
+${item[5]}<br><br>
+
+<b>🏙 Cidade</b><br>
+${item[6]}<br><br>
+
+<b>👤 Cliente</b><br>
+${item[7]}
+
+<a
+class="botao"
+href="${item[10]}"
+target="_blank"
+>
+
+🗺 Abrir Maps
+
+</a>
+
+</div>
+
+`;
+
+  });
+
+  document
+    .getElementById('resultados')
+    .innerHTML = html;
+
+}
+
+document
+.getElementById('areaMapa')
+.addEventListener(
+'change',
+carregarAreaMapa
+);
+
+async function carregarAreaMapa(){
+
+  let area =
+    document.getElementById('areaMapa').value;
+
+  banco = [];
+
+  let arquivos =
+    indexes[area];
+
+  for(let arquivo of arquivos){
+
+    let response =
+      await fetch('./' + arquivo);
+
+    let parte =
+      await response.json();
+
+    banco =
+      banco.concat(parte);
+
+  }
+
+  let mrus = [
+
+    ...new Set(
+      banco.map(i => i[0])
+    )
+
+  ];
+
+  mrus.sort();
+
+  let lista =
+    document
+    .getElementById('listaMRUsMapa');
+
+  lista.innerHTML = '';
+
+  mrus.forEach(mru => {
+
+    lista.innerHTML +=
+      `<option value="${mru}">`;
+
+  });
+
+}
+
+window.carregarMapa =
+function(){
+
+  let mru =
+    document
+    .getElementById('mruMapa')
+    .value;
+
+  let dados =
+    banco.filter(i => i[0] == mru);
+
+  if(dados.length == 0){
+
+    alert('Nenhuma instalação encontrada');
+    return;
+
+  }
+
+  if(map){
+
+    map.remove();
+
+  }
+
+  map = L.map('map')
+    .setView(
+
+      [
+        parseFloat(dados[0][8]),
+        parseFloat(dados[0][9])
+      ],
+
+      15
+
+    );
+
+  L.tileLayer(
+
+    'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+
+    {
+      attribution:'© OpenStreetMap'
+    }
+
+  ).addTo(map);
+
+  dados.forEach(item => {
+
+    if(
+      item[8] == 'nan' ||
+      item[9] == 'nan'
+    ) return;
+
+    let marker =
+      L.marker([
+
+        parseFloat(item[8]),
+        parseFloat(item[9])
+
+      ]).addTo(map);
+
+    marker.bindPopup(`
+
+<b>⚡ Instalação:</b><br>
+${item[1]}
+<br><br>
+
+<b>👤 Cliente:</b><br>
+${item[7]}
+<br><br>
+
+<b>📍 Rua:</b><br>
+${item[3]}, ${item[4]}
+<br><br>
+
+<a
+href="${item[10]}"
+target="_blank"
+>
+
+🗺 Navegar
+
+</a>
+
+`);
+
+  });
+
+}
 
 if ('serviceWorker' in navigator) {
 
   window.addEventListener('load', () => {
 
     navigator.serviceWorker
-      .register('/RotaLeiturav2/sw.js?v=13002');
+      .register('./sw.js?v=13005');
 
   });
 
