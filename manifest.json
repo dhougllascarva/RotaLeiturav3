@@ -1,7 +1,7 @@
 {
   "name":"RotaLeitura",
   "short_name":"RotaLeitura",
-  "start_url":"./index.html",
+  "start_url":"/RotaLeitura/",
   "display":"standalone",
   "background_color":"#031D44",
   "theme_color":"#031D44",
