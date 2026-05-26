@@ -16,6 +16,25 @@ content="width=device-width, initial-scale=1.0"
 
 <meta name="theme-color" content="#031D44">
 
+<meta name="mobile-web-app-capable" content="yes">
+
+<meta name="apple-mobile-web-app-capable" content="yes">
+
+<meta
+name="apple-mobile-web-app-status-bar-style"
+content="black-translucent"
+>
+
+<meta
+name="apple-mobile-web-app-title"
+content="RotaLeitura"
+>
+
+<link
+rel="apple-touch-icon"
+href="launchericon-192x192.png"
+>
+
 <link
 rel="stylesheet"
 href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
@@ -34,6 +53,7 @@ rel="stylesheet"
 
 *{
   box-sizing:border-box;
+  -webkit-tap-highlight-color:transparent;
 }
 
 body{
@@ -111,6 +131,7 @@ select:focus{
   width:100%;
   font-size:15px;
   transition:.2s;
+  cursor:pointer;
 }
 
 .botao:active{
@@ -344,22 +365,17 @@ from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
 const firebaseConfig = {
 
-  apiKey: "AIzaSyDlacPos-Jm7mi5pCWLMaXIZsnQUBXNsBc",
+  apiKey: "AIzaSyAVmx3h0aMvivJ3jAVSkyndK8buCnrRbEA",
 
-  authDomain:
-  "tellusleitura-f115b.firebaseapp.com",
+  authDomain: "rotaleitura.firebaseapp.com",
 
-  projectId:
-  "tellusleitura-f115b",
+  projectId: "rotaleitura",
 
-  storageBucket:
-  "tellusleitura-f115b.firebasestorage.app",
+  storageBucket: "rotaleitura.firebasestorage.app",
 
-  messagingSenderId:
-  "1088197735339",
+  messagingSenderId: "1084691059100",
 
-  appId:
-  "1:1088197735339:web:6d370186d58f71200fd8ee"
+  appId: "1:1084691059100:web:2ce8c10354da0cc191f859"
 
 };
 
@@ -372,7 +388,124 @@ const auth =
 const db =
   getFirestore(app);
 
-/* TODO O RESTANTE DO JS PERMANECE EXATAMENTE IGUAL */
+window.fazerLogin =
+async function(){
+
+  let email =
+    document.getElementById('email').value;
+
+  let senha =
+    document.getElementById('senha').value;
+
+  try{
+
+    await signInWithEmailAndPassword(
+      auth,
+      email,
+      senha
+    );
+
+  }catch(e){
+
+    alert('Login inválido');
+
+  }
+
+}
+
+window.logout =
+async function(){
+
+  await signOut(auth);
+
+}
+
+let permissoes = [];
+
+let banco = [];
+let indexes = {};
+let map = null;
+
+const AREAS = {
+  "171":"ITABUNA",
+  "172":"IBICARAI",
+  "173":"ILHÉUS",
+  "174":"COARACI",
+  "175":"CANAVIEIRAS",
+  "176":"CAMACAN"
+};
+
+onAuthStateChanged(auth,
+async user => {
+
+  if(!user){
+
+    document
+      .getElementById('loginTela')
+      .classList.remove('oculto');
+
+    document
+      .getElementById('appTela')
+      .classList.add('oculto');
+
+    return;
+
+  }
+
+  let ref =
+    doc(db,'usuarios',user.email);
+
+  let snap =
+    await getDoc(ref);
+
+  if(!snap.exists()){
+
+    alert('Sem permissão');
+
+    logout();
+
+    return;
+
+  }
+
+  let dados =
+    snap.data();
+
+  if(!dados.ativo){
+
+    alert('Usuário desativado');
+
+    logout();
+
+    return;
+
+  }
+
+  permissoes =
+    dados.areas;
+
+  document
+    .getElementById('loginTela')
+    .classList.add('oculto');
+
+  document
+    .getElementById('appTela')
+    .classList.remove('oculto');
+
+  carregarSistema();
+
+});
+
+if ('serviceWorker' in navigator) {
+
+  window.addEventListener('load', () => {
+
+    navigator.serviceWorker
+      .register('/RotaLeitura/sw.js?v=13001');
+
+  });
+
+}
 
 </script>
 
