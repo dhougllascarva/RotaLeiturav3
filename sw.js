@@ -1,4 +1,4 @@
-const CACHE_NAME = 'rotaleitura-v17000';
+const CACHE_NAME = 'rotaleitura-v19000';
 
 const urlsToCache = [
 
