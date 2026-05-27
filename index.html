@@ -1,8 +1,3 @@
-# INDEX.HTML FINAL — RotaLeitura
-
-Substitua TODO o conteúdo do seu `index.html` por este arquivo completo.
-
-```html
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
@@ -357,9 +352,11 @@ await signInWithEmailAndPassword(
 alert('Login inválido');
 console.error(e);
 
-}
+}finally{
 
 ocultarLoading();
+
+}
 
 }
 
@@ -410,18 +407,35 @@ await carregarSistema();
 }catch(e){
 console.error(e);
 alert('Erro ao carregar usuário');
-}
+
+}finally{
 
 ocultarLoading();
+
+}
 
 });
 
 async function carregarSistema(){
 
+try{
+
 let response = await fetch('./indexes.json');
+
+if(!response.ok){
+throw new Error('Erro ao carregar indexes');
+}
+
 indexes = await response.json();
 
 popularAreas();
+
+}catch(e){
+
+console.error(e);
+alert('Erro ao carregar sistema');
+
+}
 
 }
 
@@ -429,8 +443,8 @@ function popularAreas(){
 
 let html = '<option value="">Selecionar Área</option>';
 
-permissoes.forEach(area => {
-html += `<option value="${area}">${area} - ${AREAS[area]}</option>`;
+permissoes.forEach(areaCodigo => {
+html += `<option value="${areaCodigo}">${areaCodigo} - ${AREAS[areaCodigo] || areaCodigo}</option>`;
 });
 
 area.innerHTML = html;
@@ -500,6 +514,8 @@ async function carregarArea(){
 
 mostrarLoading('Carregando instalações...');
 
+try{
+
 bancoBusca = [];
 
 let arquivos = indexes[area.value] || [];
@@ -507,6 +523,11 @@ let arquivos = indexes[area.value] || [];
 for(let arquivo of arquivos){
 
 let response = await fetch('./'+arquivo);
+
+if(!response.ok){
+throw new Error('Erro ao carregar '+arquivo);
+}
+
 let parte = await response.json();
 
 bancoBusca = bancoBusca.concat(parte);
@@ -518,11 +539,20 @@ mrus.sort();
 
 listaMRUs.innerHTML='';
 
-mrus.forEach(mru=>{
-listaMRUs.innerHTML += `<option value="${mru}">`;
+mrus.forEach(mruItem=>{
+listaMRUs.innerHTML += `<option value="${mruItem}">`;
 });
 
+}catch(e){
+
+console.error(e);
+alert('Erro ao carregar área');
+
+}finally{
+
 ocultarLoading();
+
+}
 
 }
 
@@ -534,7 +564,7 @@ function pesquisar(){
 let filtroMRU = normalizar(mru.value);
 let filtroTexto = normalizar(busca.value);
 
-let resultados = bancoBusca.filter(item=>{
+let listaResultados = bancoBusca.filter(item=>{
 
 let okMRU = !filtroMRU || normalizar(item[0]).includes(filtroMRU);
 
@@ -556,15 +586,15 @@ return okMRU && okTexto;
 
 let html = `
 <div class="card">
-<b>${resultados.length}</b> resultado(s)
+<b>${listaResultados.length}</b> resultado(s)
 </div>
 `;
 
-if(resultados.length === 0){
+if(listaResultados.length === 0){
 html += `<div class="card">Nenhum resultado encontrado.</div>`;
 }
 
-resultados.forEach(item=>{
+listaResultados.forEach(item=>{
 
 html += `
 <div class="card">
@@ -596,8 +626,6 @@ html += `
 
 });
 
-resultados.innerHTML = html;
-
 document.getElementById('resultados').innerHTML = html;
 
 }
@@ -606,6 +634,10 @@ areaMapa.addEventListener('change', carregarAreaMapa);
 
 async function carregarAreaMapa(){
 
+mostrarLoading('Carregando mapa...');
+
+try{
+
 bancoMapa=[];
 
 let arquivos = indexes[areaMapa.value] || [];
@@ -613,6 +645,11 @@ let arquivos = indexes[areaMapa.value] || [];
 for(let arquivo of arquivos){
 
 let response = await fetch('./'+arquivo);
+
+if(!response.ok){
+throw new Error('Erro ao carregar '+arquivo);
+}
+
 let parte = await response.json();
 
 bancoMapa = bancoMapa.concat(parte);
@@ -624,9 +661,20 @@ mrus.sort();
 
 listaMRUsMapa.innerHTML='';
 
-mrus.forEach(mru=>{
-listaMRUsMapa.innerHTML += `<option value="${mru}">`;
+mrus.forEach(mruItem=>{
+listaMRUsMapa.innerHTML += `<option value="${mruItem}">`;
 });
+
+}catch(e){
+
+console.error(e);
+alert('Erro ao carregar mapa');
+
+}finally{
+
+ocultarLoading();
+
+}
 
 }
 
