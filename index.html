@@ -1267,15 +1267,11 @@ const bounds = [];
 
 const clusterGroup = L.markerClusterGroup({
 
-maxClusterRadius:15,
-disableClusteringAtZoom:17,
+maxClusterRadius:20,
 
-spiderfyOnMaxZoom:false,
+spiderfyOnMaxZoom:true,
 showCoverageOnHover:false,
-zoomToBoundsOnClick:false,
-
-chunkedLoading:true,
-removeOutsideVisibleBounds:false,
+zoomToBoundsOnClick:true,
 
 iconCreateFunction:function(cluster){
 
@@ -1330,8 +1326,6 @@ const zoomAtual = map.getZoom();
 bounds.push([lat,lng]);
 
 const marker = L.circleMarker([lat,lng],{
-
-renderer: L.canvas(),
 
 radius: zoomAtual >= 18 ? 12 : 8,
 
