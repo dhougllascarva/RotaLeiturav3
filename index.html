@@ -375,9 +375,14 @@ const inputBusca = document.getElementById('busca');
 const inputMRUMapa = document.getElementById('mruMapa');
 
 let permissoes = [];
+
 let bancoBusca = [];
 let bancoMapa = [];
+
 let indexes = {};
+
+let cacheVersao = 'v1';
+
 let map = null;
 
 const AREAS = {
