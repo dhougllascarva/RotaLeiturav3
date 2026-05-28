@@ -286,6 +286,10 @@ MAPA
 <input list="listaMRUs" id="mru" placeholder="Digite ou selecione a MRU">
 <datalist id="listaMRUs"></datalist>
 
+<button class="botao" onclick="baixarAreaOffline()">
+📥 Salvar Área Offline
+</button>
+
 <input type="text" id="busca" placeholder="Buscar instalação, medidor ou cliente">
 
 <div id="resultados"></div>
@@ -347,6 +351,7 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
+await abrirBancoOffline();
 const auth = getAuth(app);
 const db = getFirestore(app);
 
@@ -375,15 +380,108 @@ const inputBusca = document.getElementById('busca');
 const inputMRUMapa = document.getElementById('mruMapa');
 
 let permissoes = [];
-
 let bancoBusca = [];
 let bancoMapa = [];
-
 let indexes = {};
-
+let map = null;
 let cacheVersao = 'v1';
 
-let map = null;
+/* =========================
+   INDEXED DB
+========================= */
+
+let dbOffline = null;
+
+function abrirBancoOffline(){
+
+return new Promise((resolve,reject)=>{
+
+const request = indexedDB.open('RotaLeituraDB',1);
+
+request.onupgradeneeded = function(event){
+
+const db = event.target.result;
+
+if(!db.objectStoreNames.contains('areas')){
+
+db.createObjectStore('areas');
+
+}
+
+};
+
+request.onsuccess = function(event){
+
+dbOffline = event.target.result;
+
+console.log('Banco offline iniciado');
+
+resolve();
+
+};
+
+request.onerror = function(){
+
+reject('Erro ao abrir IndexedDB');
+
+};
+
+});
+
+}
+
+/* =========================
+   SALVAR ÁREA OFFLINE
+========================= */
+
+async function salvarAreaOffline(nomeArea,dados){
+
+return new Promise((resolve,reject)=>{
+
+const transaction =
+dbOffline.transaction(['areas'],'readwrite');
+
+const store = transaction.objectStore('areas');
+
+const request = store.put({
+dados:dados,
+data:Date.now()
+},nomeArea);
+
+request.onsuccess = ()=>resolve();
+
+request.onerror = ()=>reject();
+
+});
+
+}
+
+/* =========================
+   LER ÁREA OFFLINE
+========================= */
+
+async function lerAreaOffline(nomeArea){
+
+return new Promise((resolve,reject)=>{
+
+const transaction =
+dbOffline.transaction(['areas'],'readonly');
+
+const store = transaction.objectStore('areas');
+
+const request = store.get(nomeArea);
+
+request.onsuccess = ()=>{
+
+resolve(request.result);
+
+};
+
+request.onerror = ()=>reject();
+
+});
+
+}
 
 const AREAS = {
 "171":"ITABUNA",
@@ -661,6 +759,52 @@ return String(texto || '')
    BUSCA
 ========================= */
 
+window.baixarAreaOffline = async function(){
+
+try{
+
+mostrarLoading('Salvando área offline...');
+
+const area = areaSelect.value;
+
+if(!area){
+alert('Selecione uma área');
+return;
+}
+
+let dadosOffline = [];
+
+const arquivos = indexes[area] || [];
+
+for(const arquivo of arquivos){
+
+const response =
+await fetch('./'+arquivo+'?v='+Date.now());
+
+const parte = await response.json();
+
+dadosOffline = dadosOffline.concat(parte);
+
+}
+
+await salvarAreaOffline(area,dadosOffline);
+
+alert('Área salva offline com sucesso');
+
+ocultarLoading();
+
+}catch(e){
+
+console.error(e);
+
+alert('Erro ao salvar offline');
+
+ocultarLoading();
+
+}
+
+}
+
 areaSelect.addEventListener('change', carregarArea);
 
 async function carregarArea(){
@@ -673,7 +817,6 @@ bancoBusca = [];
 
 const area = areaSelect.value;
 
-const cacheKey = 'area_'+area+'_'+cacheVersao;
 
 try{
 
@@ -697,10 +840,7 @@ bancoBusca = bancoBusca.concat(parte);
    SALVAR CACHE
 ========================= */
 
-localStorage.setItem(
-cacheKey,
-JSON.stringify(bancoBusca)
-);
+await salvarAreaOffline(area,bancoBusca);
 
 }catch(erroInternet){
 
@@ -710,11 +850,11 @@ console.log('Sem internet, usando cache...');
    FALLBACK OFFLINE
 ========================= */
 
-const cacheSalvo = localStorage.getItem(cacheKey);
+const cacheSalvo = await lerAreaOffline(area);
 
 if(cacheSalvo){
 
-bancoBusca = JSON.parse(cacheSalvo);
+bancoBusca = cacheSalvo.dados;
 
 }else{
 
