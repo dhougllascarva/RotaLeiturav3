@@ -671,17 +671,62 @@ mostrarLoading('Carregando instalações...');
 
 bancoBusca = [];
 
-const arquivos = indexes[areaSelect.value] || [];
+const area = areaSelect.value;
+
+const cacheKey = 'area_'+area+'_'+cacheVersao;
+
+try{
+
+const arquivos = indexes[area] || [];
 
 for(const arquivo of arquivos){
 
 const response = await fetch('./'+arquivo+'?v='+Date.now());
+
+if(!response.ok){
+throw new Error('Erro ao baixar JSON');
+}
 
 const parte = await response.json();
 
 bancoBusca = bancoBusca.concat(parte);
 
 }
+
+/* =========================
+   SALVAR CACHE
+========================= */
+
+localStorage.setItem(
+cacheKey,
+JSON.stringify(bancoBusca)
+);
+
+}catch(erroInternet){
+
+console.log('Sem internet, usando cache...');
+
+/* =========================
+   FALLBACK OFFLINE
+========================= */
+
+const cacheSalvo = localStorage.getItem(cacheKey);
+
+if(cacheSalvo){
+
+bancoBusca = JSON.parse(cacheSalvo);
+
+}else{
+
+throw new Error('Sem internet e sem cache salvo');
+
+}
+
+}
+
+/* =========================
+   MRUS
+========================= */
 
 const mrus = [...new Set(bancoBusca.map(i=>i[0]))];
 
