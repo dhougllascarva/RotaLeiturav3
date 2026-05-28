@@ -1340,6 +1340,7 @@ fillOpacity:1
 });
 
 marker.options.link = item[10];
+marker.options.instalacao = item[1];
   
 marker.on('mouseover', function(){
 this.setStyle({
@@ -1426,8 +1427,6 @@ font-family:Inter,sans-serif;
 
 markers.forEach(m=>{
 
-const p = m.getPopup().getContent();
-
 html += `
 <div style="
 padding:10px 0;
@@ -1439,13 +1438,15 @@ font-weight:700;
 font-size:14px;
 margin-bottom:6px;
 ">
-Instalação
+⚡ Instalação
 </div>
 
 <div style="
 margin-bottom:10px;
+font-weight:600;
+color:#031D44;
 ">
-${p.match(/⚡ (.*?)<\/div>/)?.[1] || ''}
+${m.options.instalacao || ''}
 </div>
 
 <button
