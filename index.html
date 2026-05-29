@@ -231,39 +231,19 @@ select:focus{
   font-weight:600;
 }
 
-.barraContainer{
-
-width:260px;
-height:14px;
-
-background:rgba(255,255,255,.15);
-
-border-radius:999px;
-
-margin-top:20px;
-
-overflow:hidden;
-
+.statusOk{
+  color:#00A651;
+  font-weight:700;
 }
 
-#barraProgresso{
-
-width:0%;
-height:100%;
-
-background:#00E676;
-
-transition:.2s;
-
+.statusAlerta{
+  color:#FF9800;
+  font-weight:700;
 }
 
-#textoPorcentagem{
-
-margin-top:10px;
-
-font-size:14px;
-font-weight:600;
-
+.statusErro{
+  color:#D32F2F;
+  font-weight:700;
 }
 
 </style>
@@ -277,14 +257,6 @@ font-weight:600;
 
 <div class="loadingTexto">
 Carregando...
-</div>
-
-<div class="barraContainer">
-<div id="barraProgresso"></div>
-</div>
-
-<div id="textoPorcentagem">
-0%
 </div>
 
 </div>
@@ -342,11 +314,9 @@ MAPA
 <input list="listaMRUs" id="mru" placeholder="Digite ou selecione a MRU">
 <datalist id="listaMRUs"></datalist>
 
-<button class="botao" onclick="baixarAreaOffline()">
-📥 Salvar Área Offline
-</button>
-
 <input type="text" id="busca" placeholder="Buscar instalação, medidor ou cliente">
+
+<div id="statusOfflineCard" class="card oculto"></div>
 
 <div id="resultados"></div>
 
@@ -443,6 +413,9 @@ const offlineAviso = document.getElementById('offlineAviso');
 
 const resultadosDiv = document.getElementById('resultados');
 
+const statusOfflineCard =
+document.getElementById('statusOfflineCard');
+
 const inputMRU = document.getElementById('mru');
 const inputBusca = document.getElementById('busca');
 const inputMRUMapa = document.getElementById('mruMapa');
@@ -453,7 +426,9 @@ let bancoBuscaIndexado = [];
 let bancoMapa = [];
 let indexes = {};
 let map = null;
+let watchId = null;
 const CACHE_VERSION = '1.0.2';
+const DEBUG = false;
 
 /* =========================
    INDEXED DB
@@ -485,7 +460,9 @@ request.onsuccess = function(event){
 
 dbOffline = event.target.result;
 
+if(DEBUG){
 console.log('Banco offline iniciado');
+}
 
 resolve();
 
@@ -573,32 +550,12 @@ document.querySelector('.loadingTexto')
 
 /* RESET DA BARRA */
 
-document.getElementById('barraProgresso')
-.style.width = '0%';
-
-document.getElementById('textoPorcentagem')
-.innerText = '0%';
 
 }
 
 function ocultarLoading(){
 
 loadingTela.classList.add('oculto');
-
-}
-
-function atualizarBarra(atual,total){
-
-const porcentagem =
-total > 0
-? Math.floor((atual / total) * 100)
-: 0;
-
-document.getElementById('barraProgresso')
-.style.width = porcentagem + '%';
-
-document.getElementById('textoPorcentagem')
-.innerText = porcentagem + '%';
 
 }
 
@@ -650,6 +607,55 @@ ocultarLoading();
 window.logout = async function(){
 
 await signOut(auth);
+
+}
+
+/* =========================
+   VERIFICAR ACESSO
+========================= */
+
+async function verificarPermissaoAtual(){
+
+try{
+
+const user = auth.currentUser;
+
+if(!user) return;
+
+const ref = doc(db,'usuarios',user.email);
+
+const snap = await getDoc(ref);
+
+if(!snap.exists()){
+
+alert('Usuário removido.');
+
+await logout();
+
+return;
+
+}
+
+const dados = snap.data();
+
+if(!dados.ativo){
+
+alert('Seu acesso foi desativado.');
+
+await logout();
+
+return;
+
+}
+
+}catch(e){
+
+console.error(
+'Erro ao verificar acesso:',
+e
+);
+
+}
 
 }
 
@@ -797,10 +803,12 @@ if(
    cacheExistente.versao === CACHE_VERSION
 ){
 
-   console.log(
-      'Área já sincronizada:',
-      area
-   );
+if(DEBUG){
+console.log(
+'Área já sincronizada:',
+area
+);
+}
 
    continue;
 
@@ -834,10 +842,12 @@ area,
 dadosOffline
 );
 
+if(DEBUG){
 console.log(
 'Área sincronizada:',
 area
 );
+}
 
 }
 
@@ -860,6 +870,52 @@ alert(
 );
 
 ocultarLoading();
+
+}
+
+}
+
+async function atualizarStatusOffline(area){
+
+const cache = await lerAreaOffline(area);
+
+statusOfflineCard.classList.remove('oculto');
+
+if(cache){
+
+statusOfflineCard.innerHTML = `
+
+<div class="statusOk">
+🟢 Busca Offline Disponível
+</div>
+
+<div style="margin-top:8px;">
+Os dados da área estão salvos neste aparelho.
+</div>
+
+<div style="margin-top:14px;" class="statusAlerta">
+🟡 Mapas parcialmente offline
+</div>
+
+<div style="margin-top:8px;">
+Abra a região online ao menos 1x para melhor funcionamento do mapa offline.
+</div>
+
+`;
+
+}else{
+
+statusOfflineCard.innerHTML = `
+
+<div class="statusErro">
+🔴 Área ainda não sincronizada
+</div>
+
+<div style="margin-top:8px;">
+Conecte-se à internet para carregar os dados desta área.
+</div>
+
+`;
 
 }
 
@@ -916,12 +972,19 @@ if(tipo === 'busca'){
 
    /* LIMPA MAPA */
 
-   bancoMapa = [];
 
    if(map){
 
+     if(watchId){
+
+navigator.geolocation.clearWatch(watchId);
+watchId = null;
+
+}
       map.remove();
       map = null;
+     
+     document.getElementById('map').innerHTML = '';
 
    }
 
@@ -932,8 +995,6 @@ btnBusca.classList.add('ativa');
 
    /* LIMPA BUSCA */
 
-   bancoBusca = [];
-   bancoBuscaIndexado = [];
 
    resultadosDiv.innerHTML = '';
 
@@ -1000,94 +1061,6 @@ mru:normalizar(item[0]||'')
    BUSCA
 ========================= */
 
-window.baixarAreaOffline = async function(){
-
-try{
-
-mostrarLoading('Salvando área offline...');
-
-const area = areaSelect.value;
-
-if(!area){
-
-alert('Selecione uma área');
-
-ocultarLoading();
-
-return;
-
-}
-
-let dadosOffline = [];
-
-const arquivos = indexes[area] || [];
-
-let totalArquivos = arquivos.length;
-let arquivosBaixados = 0;
-
-for(const arquivo of arquivos){
-
-const response =
-await fetch('./'+arquivo+'?v=' + CACHE_VERSION);
-
-if(!response.ok){
-
-throw new Error(
-'Erro ao baixar ' + arquivo
-);
-
-}
-
-let parte = [];
-
-try{
-
-parte = await response.json();
-
-}catch{
-
-throw new Error(
-'JSON offline corrompido: ' + arquivo
-);
-
-}
-
-dadosOffline = dadosOffline.concat(parte);
-
-arquivosBaixados++;
-
-atualizarBarra(
-arquivosBaixados,
-totalArquivos
-);
-
-}
-
-await salvarAreaOffline(area,dadosOffline);
-
-document.querySelector('.loadingTexto')
-.innerText =
-'✅ Área disponível offline';
-
-setTimeout(()=>{
-
-ocultarLoading();
-
-},1000);
-
-}catch(e){
-
-console.error(e);
-
-alert(
-'Erro ao salvar offline'
-);
-
-ocultarLoading();
-
-}
-
-}
 
 areaSelect.addEventListener('change', carregarArea);
 
@@ -1120,6 +1093,8 @@ throw new Error(
 }
 
 bancoBusca = cacheSalvo.dados;
+
+await atualizarStatusOffline(area);
 
 /* =========================
    INDEXAÇÃO
@@ -1387,7 +1362,10 @@ map.remove();
 }
 
 map = L.map('map',{
-preferCanvas:true
+preferCanvas:true,
+zoomAnimation:false,
+fadeAnimation:false,
+markerZoomAnimation:false
 }).setView([
 parseFloat(primeiro[8]),
 parseFloat(primeiro[9])
@@ -1417,8 +1395,14 @@ let marcadorUsuario = null;
 
 if(navigator.geolocation){
 
-navigator.geolocation.watchPosition(
+if(watchId){
 
+navigator.geolocation.clearWatch(watchId);
+watchId = null;
+
+}
+
+watchId = navigator.geolocation.watchPosition(
 (posicao)=>{
 
 const latUser = posicao.coords.latitude;
@@ -1470,7 +1454,9 @@ font-weight:600;
 
 (erro)=>{
 
+if(DEBUG){
 console.log('Erro GPS:', erro);
+}
 
 },
 
@@ -1549,13 +1535,12 @@ item[9] == 'nan' ||
 const lat = parseFloat(item[8]);
 const lng = parseFloat(item[9]);
 
-const zoomAtual = map.getZoom();
 
 bounds.push([lat,lng]);
 
 const marker = L.circleMarker([lat,lng],{
 
-radius: zoomAtual >= 18 ? 12 : 8,
+radius:8,
 
 color:'#FFFFFF',
 weight:3,
@@ -1652,12 +1637,11 @@ font-family:Inter,sans-serif;
 ">
 `;
 
-markers.forEach(m=>{
+markers.forEach((m,index)=>{
 
 html += `
 <div style="
 padding:10px 0;
-border-bottom:1px solid #E2E8F0;
 ">
 
 <div style="
@@ -1695,6 +1679,8 @@ width:100%;
 </div>
 `;
 
+if(index < markers.length - 1){
+
 html += `
 <hr style="
 border:none;
@@ -1702,6 +1688,8 @@ border-top:1px solid #E2E8F0;
 margin:14px 0;
 ">
 `;
+
+}
 
 });
 
@@ -1766,7 +1754,16 @@ offlineAviso.classList.remove('oculto');
 
 }
 
-window.addEventListener('online', atualizarInternet);
+window.addEventListener(
+'online',
+()=>{
+
+atualizarInternet();
+
+verificarPermissaoAtual();
+
+}
+);
 window.addEventListener('offline', atualizarInternet);
 
 atualizarInternet();
@@ -1784,7 +1781,9 @@ try{
 const registro =
 await navigator.serviceWorker.register('./sw.js');
 
+if(DEBUG){
 console.log('SW registrado');
+}
 
 registro.update();
 
@@ -1803,9 +1802,10 @@ novoWorker.state === 'installed' &&
 navigator.serviceWorker.controller
 ){
 
+if(DEBUG){
 console.log('Nova versão disponível');
+}
 
-window.location.reload();
 
 }
 
@@ -1825,6 +1825,26 @@ console.error('Erro SW:', e);
 
 ocultarLoading();
 
+/* =========================
+   VERIFICA AO VOLTAR APP
+========================= */
+
+document.addEventListener(
+'visibilitychange',
+()=>{
+
+if(
+document.visibilityState === 'visible' &&
+navigator.onLine
+){
+
+verificarPermissaoAtual();
+
+}
+
+}
+);
+  
 </script>
 
 </body>
